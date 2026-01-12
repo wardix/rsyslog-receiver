@@ -1,0 +1,74 @@
+{
+    "rules": [
+        {
+            "name": "error_logs",
+            "conditions": [
+                {
+                    "field": "severity",
+                    "operator": "equals",
+                    "value": "error"
+                }
+            ],
+            "actions": [
+                {
+                    "type": "console",
+                    "config": {
+                        "prefix": "[ERROR]"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "auth_failures",
+            "conditions": [
+                {
+                    "field": "message",
+                    "operator": "contains",
+                    "value": "authentication failure"
+                }
+            ],
+            "actions": [
+                {
+                    "type": "webhook",
+                    "config": {
+                        "url": "https://example.com/security-alerts",
+                        "method": "POST",
+                        "headers": {
+                            "Authorization": "Bearer your-token-here"
+                        }
+                    }
+                },
+                {
+                    "type": "log_to_file",
+                    "config": {
+                        "path": "/var/log/auth-failures.log"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "critical_server_errors",
+            "matchOperator": "and",
+            "conditions": [
+                {
+                    "field": "host",
+                    "operator": "equals",
+                    "value": "prod-server-01"
+                },
+                {
+                    "field": "severity",
+                    "operator": "equals",
+                    "value": "error"
+                }
+            ],
+            "actions": [
+                {
+                    "type": "console",
+                    "config": {
+                        "prefix": "[CRITICAL]"
+                    }
+                }
+            ]
+        }
+    ]
+}
