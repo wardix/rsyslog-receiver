@@ -6,12 +6,18 @@ Backend HTTP service untuk menerima log dari rsyslog via omhttp module.
 
 - **Multi-user basic auth** - Dukungan multiple users via `users.json`
 - **Flexible log filtering** - Rule-based matching dengan operators: equals, contains, regex, not_equals, not_contains
-- **Extensible actions** - Webhook (dengan custom headers), log to file, console output
+- **Multiple conditions** - Support AND/OR operator untuk multiple conditions per rule
+- **Extensible actions** - Webhook (dengan custom headers & template), log to file, console output
+- **Repeated message reduction** - Deduplikasi pesan berulang seperti rsyslog
 - **Prometheus metrics** - `/metrics` endpoint untuk monitoring
 
 ## Quick Start
 
 ```bash
+# Copy example config files
+cp users.json.example users.json
+cp rules.json.example rules.json
+
 # Install dependencies
 bun install
 
@@ -48,29 +54,37 @@ PORT=3000  # Default: 3000
   "rules": [
     {
       "name": "error_logs",
-      "match": {
-        "field": "severity",
-        "operator": "equals",
-        "value": "error"
-      },
+      "conditions": [
+        { "field": "severity", "operator": "equals", "value": "error" }
+      ],
       "actions": [
-        {
-          "type": "webhook",
-          "config": {
-            "url": "https://example.com/webhook",
-            "method": "POST",
-            "headers": {
-              "Authorization": "Bearer token123"
-            }
-          }
-        }
+        { "type": "console", "config": { "prefix": "[ERROR]" } }
       ]
     }
   ]
 }
 ```
 
-#### Match Operators
+#### Multiple Conditions
+
+Gunakan `matchOperator` untuk menggabungkan beberapa kondisi:
+
+```json
+{
+  "name": "critical_server_errors",
+  "matchOperator": "and",
+  "conditions": [
+    { "field": "host", "operator": "equals", "value": "prod-server-01" },
+    { "field": "severity", "operator": "equals", "value": "error" }
+  ],
+  "actions": [...]
+}
+```
+
+- `matchOperator: "and"` - Semua kondisi harus terpenuhi (default)
+- `matchOperator: "or"` - Minimal satu kondisi harus terpenuhi
+
+#### Condition Operators
 
 | Operator | Description |
 |----------|-------------|
@@ -82,11 +96,69 @@ PORT=3000  # Default: 3000
 
 #### Action Types
 
-| Type | Config | Description |
-|------|--------|-------------|
-| `webhook` | `url`, `method`, `headers` | HTTP request ke URL |
-| `log_to_file` | `path` | Append ke file |
-| `console` | `prefix` | Print ke stdout |
+##### Console
+
+```json
+{ "type": "console", "config": { "prefix": "[ERROR]" } }
+```
+
+##### Log to File
+
+```json
+{ "type": "log_to_file", "config": { "path": "/var/log/alerts.log" } }
+```
+
+##### Webhook
+
+```json
+{
+  "type": "webhook",
+  "config": {
+    "url": "https://hooks.slack.com/services/xxx",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer token"
+    },
+    "bodyTemplate": {
+      "text": "🚨 Alert from {{host}}: {{message}}",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*{{severity}}* - {{message}}"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+**Template placeholders:** `{{field}}` akan diganti dengan nilai dari log.
+- `{{host}}`, `{{message}}`, `{{severity}}`, `{{timestamp}}`, dll.
+
+Jika `bodyTemplate` tidak diisi, webhook akan mengirim raw log JSON.
+
+#### Repeated Message Reduction
+
+Deduplikasi pesan berulang (seperti rsyslog `RepeatedMsgReduction`):
+
+```json
+{
+  "name": "error_logs",
+  "conditions": [...],
+  "repeatedMsgReduction": {
+    "enabled": true,
+    "timeoutSeconds": 60,
+    "keyFields": ["host", "message"]
+  },
+  "actions": [...]
+}
+```
+
+- `keyFields` - Field yang dibandingkan untuk mendeteksi duplikat
+- `timeoutSeconds` - Setelah timeout, kirim summary "last message repeated X times"
 
 ## API Endpoints
 
@@ -131,5 +203,6 @@ action(
 |--------|------|--------|-------------|
 | `rsyslog_logs_received_total` | Counter | - | Total logs received |
 | `rsyslog_logs_matched_total` | Counter | `rule_name` | Logs matched by rules |
+| `rsyslog_logs_suppressed_total` | Counter | `rule_name` | Logs suppressed by deduplication |
 | `rsyslog_actions_triggered_total` | Counter | `action_type`, `rule_name` | Actions triggered |
 | `rsyslog_log_processing_duration_seconds` | Histogram | - | Processing duration |
