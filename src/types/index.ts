@@ -38,11 +38,18 @@ export type ActionConfig = {
   config?: ConsoleActionConfig;
 };
 
+export interface RepeatedMsgReductionConfig {
+  enabled: boolean;
+  timeoutSeconds: number;      // Flush after this many seconds of no duplicates
+  keyFields: string[];         // Fields to compare for deduplication (e.g., ["host", "message"])
+}
+
 export interface Rule {
   name: string;
   matchOperator?: 'and' | 'or';  // Default: 'and'
   conditions: Condition[];
   actions: ActionConfig[];
+  repeatedMsgReduction?: RepeatedMsgReductionConfig;
 }
 
 export interface RulesConfig {

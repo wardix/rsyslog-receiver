@@ -17,6 +17,13 @@ export const metrics = {
         registers: [register],
     }),
 
+    logsSuppressed: new Counter({
+        name: 'rsyslog_logs_suppressed_total',
+        help: 'Total number of logs suppressed by deduplication',
+        labelNames: ['rule_name'] as const,
+        registers: [register],
+    }),
+
     actionsTriggered: new Counter({
         name: 'rsyslog_actions_triggered_total',
         help: 'Total number of actions triggered',

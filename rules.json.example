@@ -9,6 +9,11 @@
                     "value": "error"
                 }
             ],
+            "repeatedMsgReduction": {
+                "enabled": true,
+                "timeoutSeconds": 60,
+                "keyFields": ["host", "message"]
+            },
             "actions": [
                 {
                     "type": "console",
