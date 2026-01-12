@@ -36,10 +36,22 @@
                 {
                     "type": "webhook",
                     "config": {
-                        "url": "https://example.com/security-alerts",
+                        "url": "https://hooks.slack.com/services/xxx/yyy/zzz",
                         "method": "POST",
                         "headers": {
                             "Authorization": "Bearer your-token-here"
+                        },
+                        "bodyTemplate": {
+                            "text": "🚨 *Security Alert*\nHost: {{host}}\nMessage: {{message}}",
+                            "blocks": [
+                                {
+                                    "type": "section",
+                                    "text": {
+                                        "type": "mrkdwn",
+                                        "text": "*Alert from {{host}}*\n{{message}}"
+                                    }
+                                }
+                            ]
                         }
                     }
                 },

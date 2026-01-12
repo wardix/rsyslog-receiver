@@ -17,6 +17,7 @@ export interface WebhookActionConfig {
   url: string;
   method: 'POST' | 'PUT' | 'PATCH';
   headers?: Record<string, string>;
+  bodyTemplate?: Record<string, unknown>;  // Template with {{field}} placeholders
 }
 
 export interface LogToFileActionConfig {
