@@ -83,7 +83,10 @@ async function flushTracked(
 
     trackedMessages.delete(fullKey);
 
-    if (tracked.count > 1) {
+    // Check if sendSummary is enabled (default: true)
+    const sendSummary = rule.repeatedMsgReduction?.sendSummary ?? true;
+
+    if (tracked.count > 1 && sendSummary) {
         // Create summary message
         const summaryLog: SyslogMessage = {
             ...tracked.firstLog,

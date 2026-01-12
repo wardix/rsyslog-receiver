@@ -43,6 +43,7 @@ export interface RepeatedMsgReductionConfig {
   enabled: boolean;
   timeoutSeconds: number;      // Flush after this many seconds of no duplicates
   keyFields: string[];         // Fields to compare for deduplication (e.g., ["host", "message"])
+  sendSummary?: boolean;       // Send "last message repeated X times" on flush (default: true)
 }
 
 export interface Rule {
