@@ -18,7 +18,7 @@ app.route('/logs', logsRoute);
 
 console.log(`Starting rsyslog receiver on port ${config.port}`);
 
-export default {
+Bun.serve({
     port: config.port,
     fetch: app.fetch,
-};
+});
