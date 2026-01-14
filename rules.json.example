@@ -1,4 +1,11 @@
 {
+    "preprocessors": [
+        {
+            "field": "message",
+            "pattern": "^<[0-9a-fA-F]+>:\\s*",
+            "replacement": ""
+        }
+    ],
     "rules": [
         {
             "name": "error_logs",

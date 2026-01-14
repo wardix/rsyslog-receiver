@@ -54,7 +54,14 @@ export interface Rule {
   repeatedMsgReduction?: RepeatedMsgReductionConfig;
 }
 
+export interface Preprocessor {
+  field: string;           // Field to transform (e.g., "message")
+  pattern: string;         // Regex pattern to match
+  replacement: string;     // Replacement string (supports $1, $2, etc.)
+}
+
 export interface RulesConfig {
+  preprocessors?: Preprocessor[];  // Global preprocessors applied before rules
   rules: Rule[];
 }
 

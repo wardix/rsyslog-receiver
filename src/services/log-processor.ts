@@ -2,6 +2,7 @@ import { loadRules } from '../config';
 import type { Condition, Rule, SyslogMessage } from '../types';
 import { executeAction } from './actions';
 import { shouldProcess } from './deduplication';
+import { applyPreprocessors } from './preprocessor';
 import { metrics } from '../routes/metrics';
 
 const rulesConfig = loadRules();
@@ -64,12 +65,15 @@ export async function processLog(log: SyslogMessage): Promise<void> {
     const timer = metrics.processingDuration.startTimer();
 
     try {
+        // Apply global preprocessors first
+        const processedLog = applyPreprocessors(log, rulesConfig.preprocessors ?? []);
+
         for (const rule of rulesConfig.rules) {
-            if (matchRule(rule, log)) {
+            if (matchRule(rule, processedLog)) {
                 // Check deduplication - if false, message is suppressed
-                if (shouldProcess(rule, log, onDeduplicationFlush)) {
+                if (shouldProcess(rule, processedLog, onDeduplicationFlush)) {
                     metrics.logsMatched.inc({ rule_name: rule.name });
-                    await executeRuleActions(rule, log);
+                    await executeRuleActions(rule, processedLog);
                 } else {
                     metrics.logsSuppressed.inc({ rule_name: rule.name });
                 }
@@ -81,10 +85,11 @@ export async function processLog(log: SyslogMessage): Promise<void> {
 }
 
 export async function processLogs(logs: SyslogMessage | SyslogMessage[]): Promise<void> {
-    const logArray = Array.isArray(logs) ? logs : [logs]
+    const logArray = Array.isArray(logs) ? logs : [logs];
 
     for (const log of logArray) {
         await processLog(log);
     }
 }
+
 
