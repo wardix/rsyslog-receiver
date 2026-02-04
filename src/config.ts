@@ -6,6 +6,7 @@ const CONFIG_DIR = process.cwd();
 
 export const config = {
     port: parseInt(process.env.PORT || '3000', 10),
+    debugLog: process.env.DEBUG_LOG === 'true',
 };
 
 export function loadUsers(): UsersConfig {

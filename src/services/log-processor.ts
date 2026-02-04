@@ -1,4 +1,4 @@
-import { loadRules } from '../config';
+import { loadRules, config } from '../config';
 import type { Condition, Rule, SyslogMessage } from '../types';
 import { executeAction } from './actions';
 import { shouldProcess } from './deduplication';
@@ -6,6 +6,12 @@ import { applyPreprocessors } from './preprocessor';
 import { metrics } from '../routes/metrics';
 
 const rulesConfig = loadRules();
+
+function debugLog(...args: unknown[]): void {
+    if (config.debugLog) {
+        console.log('[DEBUG]', ...args);
+    }
+}
 
 function evaluateCondition(condition: Condition, log: SyslogMessage): boolean {
     const { field, operator, value } = condition;
@@ -65,16 +71,26 @@ export async function processLog(log: SyslogMessage): Promise<void> {
     const timer = metrics.processingDuration.startTimer();
 
     try {
+        // Log before preprocessor
+        debugLog('Before preprocessor:', JSON.stringify(log));
+
         // Apply global preprocessors first
         const processedLog = applyPreprocessors(log, rulesConfig.preprocessors ?? []);
 
+        // Log after preprocessor
+        debugLog('After preprocessor:', JSON.stringify(processedLog));
+
         for (const rule of rulesConfig.rules) {
             if (matchRule(rule, processedLog)) {
+                debugLog(`Rule matched: "${rule.name}"`);
+
                 // Check deduplication - if false, message is suppressed
                 if (shouldProcess(rule, processedLog, onDeduplicationFlush)) {
+                    debugLog(`Rule applied: "${rule.name}" (actions executed)`);
                     metrics.logsMatched.inc({ rule_name: rule.name });
                     await executeRuleActions(rule, processedLog);
                 } else {
+                    debugLog(`Rule suppressed: "${rule.name}" (deduplication)`);
                     metrics.logsSuppressed.inc({ rule_name: rule.name });
                 }
             }
