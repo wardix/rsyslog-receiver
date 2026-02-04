@@ -44,17 +44,11 @@ export function shouldProcess(
     const tracked = trackedMessages.get(fullKey);
 
     if (tracked && tracked.key === msgKey) {
-        // Same message - increment count and reset timeout
+        // Same message - just increment count (timeout remains from first message)
         tracked.count++;
         tracked.lastSeen = now;
 
         debugLog(`Dedup: duplicate #${tracked.count} for rule "${rule.name}", key="${msgKey}"`);
-
-        // Reset timeout
-        clearTimeout(tracked.timeoutHandle);
-        tracked.timeoutHandle = setTimeout(() => {
-            flushTracked(fullKey, rule, onFlush);
-        }, dedupConfig.timeoutSeconds * 1000);
 
         return false; // Suppress this message
     }
