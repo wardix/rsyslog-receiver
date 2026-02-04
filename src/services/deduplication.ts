@@ -1,3 +1,4 @@
+import { config } from '../config';
 import type { Rule, SyslogMessage } from '../types';
 
 interface TrackedMessage {
@@ -13,6 +14,12 @@ type FlushCallback = (rule: Rule, log: SyslogMessage, count: number) => Promise<
 // Store tracked messages per rule
 const trackedMessages = new Map<string, TrackedMessage>();
 
+function debugLog(...args: unknown[]): void {
+    if (config.debugLog) {
+        console.log('[DEBUG]', ...args);
+    }
+}
+
 function generateKey(log: SyslogMessage, keyFields: string[]): string {
     return keyFields.map((field) => String(log[field] ?? '')).join('|');
 }
@@ -22,15 +29,15 @@ export function shouldProcess(
     log: SyslogMessage,
     onFlush: FlushCallback
 ): boolean {
-    const config = rule.repeatedMsgReduction;
+    const dedupConfig = rule.repeatedMsgReduction;
 
     // If not enabled, always process
-    if (!config?.enabled) {
+    if (!dedupConfig?.enabled) {
         return true;
     }
 
     const ruleKey = rule.name;
-    const msgKey = generateKey(log, config.keyFields);
+    const msgKey = generateKey(log, dedupConfig.keyFields);
     const fullKey = `${ruleKey}:${msgKey}`;
     const now = Date.now();
 
@@ -41,11 +48,13 @@ export function shouldProcess(
         tracked.count++;
         tracked.lastSeen = now;
 
+        debugLog(`Dedup: duplicate #${tracked.count} for rule "${rule.name}", key="${msgKey}"`);
+
         // Reset timeout
         clearTimeout(tracked.timeoutHandle);
         tracked.timeoutHandle = setTimeout(() => {
             flushTracked(fullKey, rule, onFlush);
-        }, config.timeoutSeconds * 1000);
+        }, dedupConfig.timeoutSeconds * 1000);
 
         return false; // Suppress this message
     }
@@ -53,14 +62,17 @@ export function shouldProcess(
     // Different message or first message
     if (tracked) {
         // Flush previous tracked message first
+        debugLog(`Dedup: different message detected, flushing previous for rule "${rule.name}"`);
         clearTimeout(tracked.timeoutHandle);
         flushTrackedSync(fullKey, rule, onFlush);
     }
 
     // Start tracking new message
+    debugLog(`Dedup: start tracking for rule "${rule.name}", key="${msgKey}"`);
+
     const timeoutHandle = setTimeout(() => {
         flushTracked(fullKey, rule, onFlush);
-    }, config.timeoutSeconds * 1000);
+    }, dedupConfig.timeoutSeconds * 1000);
 
     trackedMessages.set(fullKey, {
         key: msgKey,
@@ -86,16 +98,22 @@ async function flushTracked(
     // Check if sendSummary is enabled (default: true)
     const sendSummary = rule.repeatedMsgReduction?.sendSummary ?? true;
 
-    if (tracked.count > 1 && sendSummary) {
-        // Create summary message
-        const summaryLog: SyslogMessage = {
-            ...tracked.firstLog,
-            message: `last message repeated ${tracked.count - 1} times`,
-            _originalMessage: tracked.firstLog.message,
-            _repeatCount: tracked.count,
-        };
+    if (tracked.count > 1) {
+        debugLog(`Dedup: flush for rule "${rule.name}", count=${tracked.count}, sendSummary=${sendSummary}`);
 
-        await onFlush(rule, summaryLog, tracked.count);
+        if (sendSummary) {
+            // Create summary message
+            const summaryLog: SyslogMessage = {
+                ...tracked.firstLog,
+                message: `last message repeated ${tracked.count - 1} times`,
+                _originalMessage: tracked.firstLog.message,
+                _repeatCount: tracked.count,
+            };
+
+            await onFlush(rule, summaryLog, tracked.count);
+        }
+    } else {
+        debugLog(`Dedup: timeout expired for rule "${rule.name}", no duplicates detected`);
     }
 }
 
