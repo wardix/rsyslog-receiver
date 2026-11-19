@@ -30,22 +30,39 @@ async function executeWebhook(
         url: string;
         method: string;
         headers?: Record<string, string>;
+        contentType?: string;
         bodyTemplate?: Record<string, unknown>;
     },
     log: SyslogMessage
 ): Promise<void> {
-    // Build request body - use template if provided, otherwise send raw log
-    const body = config.bodyTemplate
-        ? renderTemplate(config.bodyTemplate, log)
-        : log;
+    const contentType = config.contentType ?? 'application/json';
 
-    const response = await fetch(config.url, {
+    // Render URL with {{field}} placeholders
+    const url = config.url.replace(/\{\{(\w+)\}\}/g, (_, field) =>
+        encodeURIComponent(String(log[field] ?? ''))
+    );
+
+    // Build request body
+    let body: string;
+    if (contentType === 'application/x-www-form-urlencoded') {
+        const template = config.bodyTemplate
+            ? (renderTemplate(config.bodyTemplate, log) as Record<string, string>)
+            : (log as Record<string, string>);
+        body = new URLSearchParams(template).toString();
+    } else {
+        const rendered = config.bodyTemplate
+            ? renderTemplate(config.bodyTemplate, log)
+            : log;
+        body = JSON.stringify(rendered);
+    }
+
+    const response = await fetch(url, {
         method: config.method,
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': contentType,
             ...config.headers,
         },
-        body: JSON.stringify(body),
+        body,
     });
 
     if (!response.ok) {

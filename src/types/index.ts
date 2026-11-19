@@ -17,6 +17,7 @@ export interface WebhookActionConfig {
   url: string;
   method: 'POST' | 'PUT' | 'PATCH';
   headers?: Record<string, string>;
+  contentType?: 'application/json' | 'application/x-www-form-urlencoded';  // Default: application/json
   bodyTemplate?: Record<string, unknown>;  // Template with {{field}} placeholders
 }
 
@@ -57,7 +58,8 @@ export interface Rule {
 export interface Preprocessor {
   field: string;           // Field to transform (e.g., "message")
   pattern: string;         // Regex pattern to match
-  replacement: string;     // Replacement string (supports $1, $2, etc.)
+  replacement?: string;    // Replacement string (supports $1, $2, etc.) — required if extract is false
+  extract?: boolean;       // If true, named capture groups are extracted as new top-level fields
 }
 
 export interface RulesConfig {
